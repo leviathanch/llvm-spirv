@@ -1,14 +1,7 @@
-set(LLVM_LINK_COMPONENTS
-  Analysis
-  BitReader
-  BitWriter
-  IPO
-  SPIRVLib
-  Core
-  Support
-  TransformUtils
-  )
+add_executable(llvm-spirv llvm-spirv.cpp)
 
-add_llvm_tool(llvm-spirv
-  llvm-spirv.cpp
-  )
+target_include_directories(llvm-spirv PRIVATE ${LLVM_INCLUDE_DIRS})
+target_include_directories(llvm-spirv PRIVATE ${LLVM_SPIRV_INCLUDE_DIRS})
+  
+target_link_libraries(llvm-spirv llvm_spirv LLVM)
+

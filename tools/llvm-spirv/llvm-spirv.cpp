@@ -45,14 +45,15 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/DataStream.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
@@ -62,7 +63,7 @@
 #define _SPIRV_SUPPORT_TEXT_FMT
 #endif
 
-#include "llvm/Support/SPIRV.h"
+#include "SPIRV.h"
 
 #include <memory>
 #include <fstream>
@@ -117,26 +118,31 @@ removeExt(const std::string& FileName) {
 static int
 convertLLVMToSPIRV() {
   LLVMContext Context;
-
-  std::string Err;
-  DataStreamer *DS = getDataFileStreamer(InputFile, &Err);
-  if (!DS) {
-    errs() << "Fails to open input file: " << Err;
+    std::string Err;
+  auto mem =  MemoryBuffer::getFile(InputFile);
+  
+  if (!mem) {
+    errs() << "Fails to open input file: " << InputFile;
     return -1;
   }
-
-  ErrorOr<std::unique_ptr<Module>> MOrErr =
-      getStreamedBitcodeModule(InputFile, DS, Context);
-
-  if (std::error_code EC = MOrErr.getError()) {
-    errs() << "Fails to load bitcode: " << EC.message();
+  auto mods = getBitcodeModuleList(mem.get()->getMemBufferRef());
+  
+  if (!mods)  {
+    errs() << "Fails to open input file: " << InputFile;
     return -1;
   }
+  
+  BitcodeModule bm(mods.get()[0]);
+  auto mod = bm.getLazyModule(Context,true,false);
+  
+  if (!mod) {
+    errs() << "Fails to load bitcode: " << InputFile;
+    return -1;
+  }
+  std::unique_ptr<Module> M = std::move(*mod);
 
-  std::unique_ptr<Module> M = std::move(*MOrErr);
-
-  if (std::error_code EC = M->materializeAllPermanently()){
-    errs() << "Fails to materialize: " << EC.message();
+  if (Error EC = M->materializeAll()){
+    errs() << "Fails to materialize: " << InputFile;
     return -1;
   }
 
@@ -187,7 +193,7 @@ convertSPIRVToLLVM() {
   }
 
   std::error_code EC;
-  tool_output_file Out(OutputFile.c_str(), EC, sys::fs::F_None);
+  ToolOutputFile Out(OutputFile.c_str(), EC, sys::fs::F_None);
   if (EC) {
     errs() << "Fails to open output file: " << EC.message();
     return -1;
@@ -237,28 +243,30 @@ convertSPIRV() {
 static int
 regularizeLLVM() {
   LLVMContext Context;
-
   std::string Err;
-  DataStreamer *DS = getDataFileStreamer(InputFile, &Err);
-  if (!DS) {
-    errs() << "Fails to open input file: " << Err;
+  auto mem =  MemoryBuffer::getFile(InputFile);
+  
+  if (!mem) {
+    errs() << "Fails to open input file: " << InputFile;
+    return -1;
+  }
+  auto mods = getBitcodeModuleList(mem.get()->getMemBufferRef());
+  
+  if (!mods)  {
+    errs() << "Fails to open input file: " << InputFile;
     return -1;
   }
 
-  ErrorOr<std::unique_ptr<Module>> MOrErr =
-      getStreamedBitcodeModule(InputFile, DS, Context);
-
-  if (std::error_code EC = MOrErr.getError()) {
-    errs() << "Fails to load bitcode: " << EC.message();
+  BitcodeModule bm(mods.get()[0]);
+  auto mod = bm.getLazyModule(Context,true,false);
+  
+  if (!mod) {
+    errs() << "Fails to load bitcode: " << InputFile;
     return -1;
   }
 
-  std::unique_ptr<Module> M = std::move(*MOrErr);
+  std::unique_ptr<Module> M = std::move(*mod);
 
-  if (std::error_code EC = M->materializeAllPermanently()){
-    errs() << "Fails to materialize: " << EC.message();
-    return -1;
-  }
 
   if (OutputFile.empty()) {
     if (InputFile == "-")
@@ -273,7 +281,7 @@ regularizeLLVM() {
   }
 
   std::error_code EC;
-  tool_output_file Out(OutputFile.c_str(), EC, sys::fs::F_None);
+  ToolOutputFile Out(OutputFile.c_str(), EC, sys::fs::F_None);
   if (EC) {
     errs() << "Fails to open output file: " << EC.message();
     return -1;
@@ -288,7 +296,7 @@ regularizeLLVM() {
 int
 main(int ac, char** av) {
   EnablePrettyStackTrace();
-  sys::PrintStackTraceOnErrorSignal();
+  sys::PrintStackTraceOnErrorSignal(av[0]);
   PrettyStackTraceProgram X(ac, av);
 
   cl::ParseCommandLineOptions(ac, av, "LLVM/SPIR-V translator");
@@ -323,3 +331,4 @@ main(int ac, char** av) {
 
   return 0;
 }
+
