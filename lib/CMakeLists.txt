@@ -43,3 +43,7 @@ target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Mangle
 
 target_link_libraries(llvm_spirv LLVM)
 
+install(
+  TARGETS llvm_spirv
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
