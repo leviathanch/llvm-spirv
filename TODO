@@ -1,3 +1,5 @@
+* Find a better name, one that cannot be easily mistaken with Khronos' original work
+* Host it in freedesktop.org or github
 * Fix running the test suite
 * Update the README
 * ...
