@@ -58,6 +58,11 @@
 #include <functional>
 #include <sstream>
 
+#include "llvm/Config/llvm-config.h"
+#if LLVM_VERSION_MAJOR < 6
+#define ToolOutputFile tool_output_file
+#endif
+
 #define DEBUG_TYPE "spirv"
 
 namespace SPIRV{

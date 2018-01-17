@@ -69,6 +69,11 @@
 #include <fstream>
 #include <iostream>
 
+#include "llvm/Config/llvm-config.h"
+#if LLVM_VERSION_MAJOR < 6
+#define ToolOutputFile tool_output_file
+#endif
+
 #define DEBUG_TYPE "spirv"
 
 namespace kExt {
