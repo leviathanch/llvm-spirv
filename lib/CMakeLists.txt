@@ -41,7 +41,7 @@ target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libSPIRV)
 target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Mangler)
 
-target_link_libraries(llvm_spirv LLVM)
+target_link_libraries(llvm_spirv ${LLVM_LIBS_CORE})
 
 install(
   TARGETS llvm_spirv
