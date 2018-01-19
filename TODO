@@ -2,4 +2,5 @@
 * Host it in freedesktop.org or github
 * Fix running the test suite
 * Update the README
+* Make use of more variables set by FindLLVM.cmake instead of hardcoding flags, etc to cater for different build environments
 * ...
