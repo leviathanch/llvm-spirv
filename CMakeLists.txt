@@ -38,3 +38,10 @@ install(
   DESTINATION
     ${CMAKE_INSTALL_INCLUDEDIR}/llvm-spirv/)
 
+
+configure_file(llvm-spirv.pc.in ${CMAKE_BINARY_DIR}/llvm-spirv.pc @ONLY)
+install(
+  FILES
+    ${CMAKE_BINARY_DIR}/llvm-spirv.pc
+  DESTINATION
+    ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
