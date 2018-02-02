@@ -141,7 +141,9 @@ public:
   bool isSigned() const { return IsSigned;}
   SPIRVCapVec getRequiredCapability() const {
     SPIRVCapVec CV;
-    if (isTypeInt(16))
+    if (isTypeInt(8))
+      CV.push_back(CapabilityInt8);
+    else if (isTypeInt(16))
       CV.push_back(CapabilityInt16);
     else if (isTypeInt(64))
       CV.push_back(CapabilityInt64);
