@@ -62,7 +62,7 @@ SPIRVModule::~SPIRVModule()
 class SPIRVModuleImpl : public SPIRVModule {
 public:
   SPIRVModuleImpl():SPIRVModule(), NextId(1), BoolType(NULL),
-    SPIRVVersion(SPV_VERSION),
+    SPIRVVersion(0x10000),
     GeneratorId(SPIRVGEN_KhronosLLVMSPIRVTranslator),
     GeneratorVer(0),
     InstSchema(SPIRVISCH_Default),
@@ -141,6 +141,11 @@ public:
   void setSourceLanguage(SourceLanguage Lang, SPIRVWord Ver) {
     SrcLang = Lang;
     SrcLangVer = Ver;
+
+    if (SrcLangVer <= 201000)
+      SPIRVVersion = 0x10000;
+    else
+      SPIRVVersion = 0x10100;
   }
   void setGeneratorId(unsigned short Id) { GeneratorId = Id; }
   void setGeneratorVer(unsigned short Ver) { GeneratorVer = Ver; }
