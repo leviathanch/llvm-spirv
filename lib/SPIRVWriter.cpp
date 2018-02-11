@@ -207,6 +207,7 @@ public:
   SPIRVWord transFunctionControlMask(CallInst *);
   SPIRVWord transFunctionControlMask(Function *);
   SPIRVFunction *transFunctionDecl(Function *F);
+  SPIRVValue *transLLVMBuiltinFunction(Function *F);
   bool transGlobalVariables();
 
   Op transBoolOpCode(SPIRVValue *Opn, Op OC);
@@ -287,6 +288,7 @@ private:
   void oclGetMutatedArgumentTypesByBuiltin(llvm::FunctionType* FT,
       std::map<unsigned, Type*>& ChangedType, Function* F);
 
+  bool isLLVMBuiltinFunction(Function *F);
   bool isBuiltinTransToInst(Function *F);
   bool isBuiltinTransToExtInst(Function *F,
       SPIRVExtInstSetKind *BuiltinSet = nullptr,
@@ -330,6 +332,11 @@ LLVMToSPIRV::oclIsKernel(Function *F) {
   if (F->getCallingConv() == CallingConv::SPIR_KERNEL)
     return true;
   return false;
+}
+
+bool
+LLVMToSPIRV::isLLVMBuiltinFunction(Function *F) {
+  return F->hasName() && F->getName().startswith("llvm.");
 }
 
 bool
@@ -668,6 +675,13 @@ LLVMToSPIRV::transFunctionDecl(Function *F) {
   return BF;
 }
 
+SPIRVValue *
+LLVMToSPIRV::transLLVMBuiltinFunction(Function *F) {
+  SPIRVCK(false, Unsupported, "LLVM builtin function \"" + F->getName().str() +
+          "\" is unsupported.");
+  return nullptr;
+}
+
 #define _SPIRV_OPL(x) OpLogical##x
 
 #define _SPIRV_OPB(x) OpBitwise##x
@@ -840,8 +854,12 @@ LLVMToSPIRV::transValueWithoutDecoration(Value *V, SPIRVBasicBlock *BB,
     return BB;
   }
 
-  if (auto F = dyn_cast<Function>(V))
-    return transFunctionDecl(F);
+  if (auto F = dyn_cast<Function>(V)) {
+    if (isLLVMBuiltinFunction(F))
+      return transLLVMBuiltinFunction(F);
+  else
+      return transFunctionDecl(F);
+  }
 
   if (auto GV = dyn_cast<GlobalVariable>(V)) {
     llvm::PointerType * Ty = GV->getType();
@@ -1184,6 +1202,9 @@ LLVMToSPIRV::transCallInst(CallInst *CI, SPIRVBasicBlock *BB) {
       ExtOp,
       transArguments(CI, BB, SPIRVEntry::create_unique(ExtSetKind, ExtOp).get()),
       BB), Dec);
+
+  if (isLLVMBuiltinFunction(F))
+    return transLLVMBuiltinFunction(F);
 
   return BM->addCallInst(
     transFunctionDecl(CI->getCalledFunction()),
