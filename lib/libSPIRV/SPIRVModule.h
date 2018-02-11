@@ -223,6 +223,8 @@ public:
       SPIRVValue *Event, SPIRVBasicBlock *BB) = 0;
   virtual SPIRVInstruction *addBinaryInst(Op, SPIRVType *, SPIRVValue *,
       SPIRVValue *, SPIRVBasicBlock *) = 0;
+  virtual SPIRVInstruction * addLifetimeInst(Op TheOpCode, SPIRVValue *Pointer,
+      uint64_t Size, SPIRVBasicBlock *BB) = 0;
   virtual SPIRVInstruction *addBranchConditionalInst(SPIRVValue *, SPIRVLabel *,
       SPIRVLabel *, SPIRVBasicBlock *) = 0;
   virtual SPIRVInstruction *addBranchInst(SPIRVLabel *, SPIRVBasicBlock *) = 0;
