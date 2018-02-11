@@ -236,6 +236,8 @@ public:
       SPIRVBasicBlock *);
   virtual SPIRVInstruction *addBinaryInst(Op, SPIRVType *, SPIRVValue *,
       SPIRVValue *, SPIRVBasicBlock *);
+  virtual SPIRVInstruction * addLifetimeInst(Op TheOpCode, SPIRVValue *Pointer,
+      uint64_t Size, SPIRVBasicBlock *BB);
   virtual SPIRVInstruction *addCallInst(SPIRVFunction*,
       const std::vector<SPIRVWord> &, SPIRVBasicBlock *);
   virtual SPIRVInstruction *addCmpInst(Op, SPIRVType *, SPIRVValue *,
@@ -967,6 +969,14 @@ SPIRVModuleImpl::addBinaryInst(Op TheOpCode, SPIRVType *Type,
     SPIRVValue *Op1, SPIRVValue *Op2, SPIRVBasicBlock *BB){
   return addInstruction(SPIRVInstTemplateBase::create(TheOpCode, Type, getId(),
       getVec(Op1->getId(), Op2->getId()), BB, this), BB);
+}
+
+SPIRVInstruction *
+SPIRVModuleImpl::addLifetimeInst(Op TheOpCode, SPIRVValue *Pointer,
+    uint64_t Size, SPIRVBasicBlock *BB){
+  return addInstruction(SPIRVInstTemplateBase::create(TheOpCode, nullptr,
+      SPIRVID_INVALID, getVec(Pointer->getId(), static_cast<uint32_t>(Size)),
+      BB, this), BB);
 }
 
 SPIRVInstruction *

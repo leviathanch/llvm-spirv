@@ -682,6 +682,29 @@ _SPIRV_OP(BitwiseXor)
 _SPIRV_OP(Dot)
 #undef _SPIRV_OP
 
+class SPIRVLifetime:public SPIRVInstTemplateBase {
+protected:
+  void validate()const {
+    SPIRVId Pointer = Ops[0];
+    SPIRVId Size = Ops[1];
+    SPIRVInstruction::validate();
+    assert(getValueType(Pointer)->isTypePointer() &&
+        "Pointer must be of type pointer");
+    assert(getValueType(Pointer)->getPointerStorageClass() == SPIRVStorageClassKind::StorageClassFunction &&
+        "Pointer's storage class must be Function");
+    assert(isOperandLiteral(1u) && "Size must be a literal");
+  }
+};
+
+template<Op OC>
+class SPIRVLifetimeInst:public SPIRVInstTemplate<SPIRVLifetime, OC, false, 3, false, 1> {
+};
+
+#define _SPIRV_OP(x) typedef SPIRVLifetimeInst<Op##x> SPIRV##x;
+_SPIRV_OP(LifetimeStart)
+_SPIRV_OP(LifetimeStop)
+#undef _SPIRV_OP
+
 template<Op TheOpCode>
 class SPIRVInstNoOperand:public SPIRVInstruction {
 public:

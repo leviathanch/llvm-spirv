@@ -208,6 +208,7 @@ public:
   SPIRVWord transFunctionControlMask(Function *);
   SPIRVFunction *transFunctionDecl(Function *F);
   SPIRVValue *transLLVMBuiltinFunction(Function *F);
+  SPIRVValue *transLLVMBuiltinFunctionCall(CallInst *CI, SPIRVBasicBlock *BB);
   bool transGlobalVariables();
 
   Op transBoolOpCode(SPIRVValue *Opn, Op OC);
@@ -631,6 +632,9 @@ LLVMToSPIRV::transSPIRVOpaqueType(Type *T) {
 
 SPIRVFunction *
 LLVMToSPIRV::transFunctionDecl(Function *F) {
+  if (isLLVMBuiltinFunction(F))
+    return static_cast<SPIRVFunction *>(transLLVMBuiltinFunction(F));
+
   if (auto BF= getTranslatedValue(F))
     return static_cast<SPIRVFunction *>(BF);
 
@@ -677,6 +681,51 @@ LLVMToSPIRV::transFunctionDecl(Function *F) {
 
 SPIRVValue *
 LLVMToSPIRV::transLLVMBuiltinFunction(Function *F) {
+  auto MangledName = F->getName();
+
+  if (MangledName.startswith("llvm.lifetime.start") ||
+      MangledName.startswith("llvm.lifetime.end"))
+    return nullptr;
+
+  SPIRVCK(false, Unsupported, "LLVM builtin function \"" + MangledName.str() +
+          "\" is unsupported.");
+  return nullptr;
+}
+
+SPIRVValue *
+LLVMToSPIRV::transLLVMBuiltinFunctionCall(CallInst *CI, SPIRVBasicBlock *BB) {
+  llvm::Function* F = CI->getCalledFunction();
+  auto MangledName = F->getName();
+
+  if (MangledName.startswith("llvm.memcpy")) {
+    std::vector<SPIRVWord> MemoryAccess;
+
+    if (isa<ConstantInt>(CI->getOperand(4)) &&
+      dyn_cast<ConstantInt>(CI->getOperand(4))
+      ->getZExtValue() == 1)
+      MemoryAccess.push_back(MemoryAccessVolatileMask);
+    if (isa<ConstantInt>(CI->getOperand(3))) {
+        MemoryAccess.push_back(MemoryAccessAlignedMask);
+        MemoryAccess.push_back(dyn_cast<ConstantInt>(CI->getOperand(3))
+          ->getZExtValue());
+    }
+
+    return BM->addCopyMemorySizedInst(
+      transValue(CI->getOperand(0), BB),
+      transValue(CI->getOperand(1), BB),
+      transValue(CI->getOperand(2), BB),
+      MemoryAccess,
+      BB);
+  } else if (MangledName.startswith("llvm.lifetime.start")) {
+    return BM->addLifetimeInst(OpLifetimeStart,
+                               transValue(CI->getOperand(1), BB),
+                               cast<ConstantInt>(CI->getOperand(0))->getZExtValue(), BB);
+  } else if (MangledName.startswith("llvm.lifetime.end")) {
+    return BM->addLifetimeInst(OpLifetimeStop,
+                               transValue(CI->getOperand(1), BB),
+                               cast<ConstantInt>(CI->getOperand(0))->getZExtValue(), BB);
+  }
+
   SPIRVCK(false, Unsupported, "LLVM builtin function \"" + F->getName().str() +
           "\" is unsupported.");
   return nullptr;
@@ -854,12 +903,8 @@ LLVMToSPIRV::transValueWithoutDecoration(Value *V, SPIRVBasicBlock *BB,
     return BB;
   }
 
-  if (auto F = dyn_cast<Function>(V)) {
-    if (isLLVMBuiltinFunction(F))
-      return transLLVMBuiltinFunction(F);
-  else
-      return transFunctionDecl(F);
-  }
+  if (auto F = dyn_cast<Function>(V))
+    return transFunctionDecl(F);
 
   if (auto GV = dyn_cast<GlobalVariable>(V)) {
     llvm::PointerType * Ty = GV->getType();
@@ -1167,26 +1212,8 @@ LLVMToSPIRV::transCallInst(CallInst *CI, SPIRVBasicBlock *BB) {
   if (MangledName.startswith(SPCV_CAST))
     return transSpcvCast(CI, BB);
 
-  if (MangledName.startswith("llvm.memcpy")) {
-    std::vector<SPIRVWord> MemoryAccess;
-
-    if (isa<ConstantInt>(CI->getOperand(4)) &&
-      dyn_cast<ConstantInt>(CI->getOperand(4))
-      ->getZExtValue() == 1)
-      MemoryAccess.push_back(MemoryAccessVolatileMask);
-    if (isa<ConstantInt>(CI->getOperand(3))) {
-        MemoryAccess.push_back(MemoryAccessAlignedMask);
-        MemoryAccess.push_back(dyn_cast<ConstantInt>(CI->getOperand(3))
-          ->getZExtValue());
-    }
-
-    return BM->addCopyMemorySizedInst(
-      transValue(CI->getOperand(0), BB),
-      transValue(CI->getOperand(1), BB),
-      transValue(CI->getOperand(2), BB),
-      MemoryAccess,
-      BB);
-  }
+  if (isLLVMBuiltinFunction(F))
+    return transLLVMBuiltinFunctionCall(CI, BB);
 
   if (oclIsBuiltin(MangledName, &DemangledName) ||
       isDecoratedSPIRVFunc(F, &DemangledName))
@@ -1202,9 +1229,6 @@ LLVMToSPIRV::transCallInst(CallInst *CI, SPIRVBasicBlock *BB) {
       ExtOp,
       transArguments(CI, BB, SPIRVEntry::create_unique(ExtSetKind, ExtOp).get()),
       BB), Dec);
-
-  if (isLLVMBuiltinFunction(F))
-    return transLLVMBuiltinFunction(F);
 
   return BM->addCallInst(
     transFunctionDecl(CI->getCalledFunction()),
