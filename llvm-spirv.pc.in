@@ -6,7 +6,7 @@ includedir=${prefix}/include
 Name: llvm-spirv
 Description: LLVM/SPIR-V bi-direction translator
 Version: @LLVM_SPIRV_VERSION@
-URL: https://gitlab.collabora.com/tomeu/llvm-spirv
+URL: https://github.com/pierremoreau/llvm-spirv
 
 Libs: -L${libdir} -lllvm_spirv
 Cflags: -I${includedir}
