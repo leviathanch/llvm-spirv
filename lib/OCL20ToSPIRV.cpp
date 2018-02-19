@@ -1188,7 +1188,7 @@ void OCL20ToSPIRV::transWorkItemBuiltinsToVariables() {
         nullptr, BuiltinVarName,
         0,
         GlobalVariable::NotThreadLocal,
-        SPIRAS_Constant);
+        SPIRAS_Input);
     std::vector<Instruction *> InstList;
     for (auto UI = I->user_begin(), UE = I->user_end(); UI != UE; ++UI) {
       auto CI = dyn_cast<CallInst>(*UI);
