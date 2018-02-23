@@ -1,13 +1,9 @@
-include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libSPIRV
-  ${CMAKE_CURRENT_SOURCE_DIR}/Mangler
-  ${CMAKE_CURRENT_SOURCE_DIR}/..)
-
 option(SPIRV_USE_LLVM_API "Enable usage of LLVM API for libSPIRV." ON)
 if ( SPIRV_USE_LLVM_API )
   add_definitions(-D_SPIRV_LLVM_API)
 endif()
 
-add_llvm_library(LLVMSPIRVLib
+add_library(llvm_spirv SHARED
   libSPIRV/SPIRVBasicBlock.cpp
   libSPIRV/SPIRVDebug.cpp
   libSPIRV/SPIRVDecorate.cpp
@@ -18,6 +14,7 @@ add_llvm_library(LLVMSPIRVLib
   libSPIRV/SPIRVStream.cpp
   libSPIRV/SPIRVType.cpp
   libSPIRV/SPIRVValue.cpp
+#  libSPIRV/SPIRVUtil.cpp
   Mangler/FunctionDescriptor.cpp
   Mangler/Mangler.cpp
   Mangler/ManglingUtils.cpp
@@ -30,14 +27,24 @@ add_llvm_library(LLVMSPIRVLib
   SPIRVLowerBool.cpp
   SPIRVLowerConstExpr.cpp
   SPIRVLowerOCLBlocks.cpp
-  SPIRVLowerMemmove.cpp
+  SPIRVUtil.cpp
   SPIRVReader.cpp
   SPIRVRegularizeLLVM.cpp
   SPIRVToOCL20.cpp
-  SPIRVUtil.cpp
   SPIRVWriter.cpp
   SPIRVWriterPass.cpp
   TransOCLMD.cpp
-  )
+)
 
-add_dependencies(LLVMSPIRVLib intrinsics_gen)
+target_include_directories(llvm_spirv PRIVATE ${LLVM_INCLUDE_DIRS})
+target_include_directories(llvm_spirv PRIVATE ${LLVM_SPIRV_INCLUDE_DIRS})
+target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libSPIRV)
+target_include_directories(llvm_spirv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Mangler)
+
+target_link_libraries(llvm_spirv ${LLVM_LIBS_CORE})
+
+install(
+  TARGETS llvm_spirv
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
