@@ -38,26 +38,27 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVModule.h"
-#include "SPIRVEnum.h"
-#include "SPIRVEntry.h"
-#include "SPIRVType.h"
-#include "SPIRVValue.h"
-#include "SPIRVFunction.h"
-#include "SPIRVBasicBlock.h"
-#include "SPIRVInstruction.h"
-#include "SPIRVExtInst.h"
-#include "SPIRVUtil.h"
-#include "SPIRVInternal.h"
-#include "SPIRVMDWalker.h"
+#include "libSPIRV/SPIRVModule.h"
+#include "libSPIRV/SPIRVEnum.h"
+#include "libSPIRV/SPIRVEntry.h"
+#include "libSPIRV/SPIRVType.h"
+#include "libSPIRV/SPIRVValue.h"
+#include "libSPIRV/SPIRVFunction.h"
+#include "libSPIRV/SPIRVBasicBlock.h"
+#include "libSPIRV/SPIRVInstruction.h"
+#include "libSPIRV/SPIRVExtInst.h"
 #include "OCLTypeToSPIRV.h"
 #include "OCLUtil.h"
+#include "SPIRVInternal.h"
+#include "SPIRVMDWalker.h"
+#include "SPIRVUtil.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DebugInfo.h"
@@ -65,12 +66,12 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Pass.h"
 #include "llvm/PassSupport.h"
-#include "llvm/PassManager.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -680,9 +681,9 @@ LLVMToSPIRV::transFunctionDecl(Function *F) {
                       Attrs.getAttribute(ArgNo + 1, Attribute::Dereferenceable)
                         .getDereferenceableBytes());
   }
-  if (Attrs.hasAttribute(AttributeSet::ReturnIndex, Attribute::ZExt))
+  if (Attrs.hasAttribute(AttributeList::ReturnIndex, Attribute::ZExt))
     BF->addDecorate(DecorationFuncParamAttr, FunctionParameterAttributeZext);
-  if (Attrs.hasAttribute(AttributeSet::ReturnIndex, Attribute::SExt))
+  if (Attrs.hasAttribute(AttributeList::ReturnIndex, Attribute::SExt))
     BF->addDecorate(DecorationFuncParamAttr, FunctionParameterAttributeSext);
   DbgTran.transDbgInfo(F, BF);
   SPIRVDBG(dbgs() << "[transFunction] " << *F << " => ";
@@ -846,7 +847,7 @@ LLVMToSPIRV::transLifetimeIntrinsicInst(Op OC, IntrinsicInst *II, SPIRVBasicBloc
 
   if (auto AI = dyn_cast<AllocaInst>(Op1)) {
     assert(!Size ||
-      M->getDataLayout()->getTypeSizeInBits(AI->getAllocatedType()) == Size * 8 &&
+      M->getDataLayout().getTypeSizeInBits(AI->getAllocatedType()) == Size * 8 &&
       "Size of the argument should match the allocated memory");
     return BM->addLifetimeInst(OC, transValue(Op1, BB), Size, BB);
   }
@@ -860,7 +861,7 @@ LLVMToSPIRV::transLifetimeIntrinsicInst(Op OC, IntrinsicInst *II, SPIRVBasicBloc
   }
   auto AI = dyn_cast<AllocaInst>(dyn_cast<BitCastInst>(Op1)->getOperand(0));
   assert(AI && (!Size ||
-      M->getDataLayout()->getTypeSizeInBits(AI->getAllocatedType()) == Size * 8) &&
+      M->getDataLayout().getTypeSizeInBits(AI->getAllocatedType()) == Size * 8) &&
       "Size of the argument should match the allocated memory");
   auto LT = BM->addLifetimeInst(OC, transValue(AI, BB), Size, BB);
   auto BC = LT->getPrevious();
@@ -1437,7 +1438,7 @@ bool
 LLVMToSPIRV::transGlobalVariables() {
   for (auto I = M->global_begin(),
             E = M->global_end(); I != E; ++I) {
-    if (!transValue(I, nullptr))
+    if (!transValue(&*I, nullptr))
       return false;
   }
   return true;
@@ -1536,7 +1537,7 @@ LLVMToSPIRV::translate() {
 
 llvm::IntegerType* LLVMToSPIRV::getSizetType() {
   return IntegerType::getIntNTy(M->getContext(),
-    M->getDataLayout()->getPointerSizeInBits());
+    M->getDataLayout().getPointerSizeInBits());
 }
 
 void

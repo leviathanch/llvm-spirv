@@ -82,9 +82,6 @@ OCLTypeToSPIRV::runOnModule(Module& Module) {
   for (auto &F:Module.functions())
     adaptArgumentsByMetadata(&F);
 
-  for (auto &F:Module.functions())
-    adaptFunctionArguments(&F);
-
   adaptArgumentsBySamplerUse(Module);
 
   while (!WorkSet.empty()) {
@@ -128,7 +125,7 @@ static unsigned
 getArgIndex(Function *F, Value *V) {
   auto A = F->arg_begin(), E = F->arg_end();
   for (unsigned I = 0; A != E; ++I, ++A) {
-    if (A == V)
+    if (&*A == V)
       return I;
   }
   llvm_unreachable("Not argument of function");
@@ -139,7 +136,7 @@ static Argument*
 getArg(Function *F, unsigned I) {
   auto AI = F->arg_begin();
   std::advance(AI, I);
-  return AI;
+  return &*AI;
 }
 
 /// Create a new function type if \param F has arguments in AdaptedTy, and
@@ -277,35 +274,6 @@ void OCLTypeToSPIRV::adaptArgumentsBySamplerUse(Module &M) {
   }
 }
 
-void
-OCLTypeToSPIRV::adaptFunctionArguments(Function* F) {
-  auto TypeMD = getArgBaseTypeMetadata(F);
-  if (TypeMD)
-    return;
-  bool Changed = false;
-  auto FT = F->getFunctionType();
-  auto PI = FT->param_begin();
-  auto Arg = F->arg_begin();
-  for (unsigned I = 0; I < F->getArgumentList().size(); ++I, ++PI, ++Arg) {
-    auto NewTy = *PI;
-    if (isPointerToOpaqueStructType(NewTy)) {
-      auto STName = NewTy->getPointerElementType()->getStructName();
-      if (!hasAccessQualifiedName(STName))
-          continue;
-      if (STName.startswith(kSPR2TypeName::ImagePrefix) ||
-          STName == kSPR2TypeName::Pipe) {
-        auto Ty = STName.str();
-        auto AccStr = getAccessQualifier(Ty);
-        addAdaptedType(Arg, getOrCreateOpaquePtrType(M,
-                       mapOCLTypeNameToSPIRV(Ty, AccStr)));
-        Changed = true;
-      }
-    }
-  }
-  if (Changed)
-    addWork(F);
-}
-
 /// Go through all kernel functions, get access qualifier for image and pipe
 /// types and use them to map the function arguments to the SPIR-V type.
 /// ToDo: Map other OpenCL opaque types to SPIR-V types.
@@ -323,7 +291,7 @@ OCLTypeToSPIRV::adaptArgumentsByMetadata(Function* F) {
     auto OCLTyStr = getMDOperandAsString(TypeMD, I);
     auto NewTy = *PI;
     if (OCLTyStr == OCL_TYPE_NAME_SAMPLER_T && !NewTy->isStructTy()) {
-      addAdaptedType(Arg, getSamplerType(M));
+      addAdaptedType(&*Arg, getSamplerType(M));
       Changed = true;
     } else if (isPointerToOpaqueStructType(NewTy)) {
       auto STName = NewTy->getPointerElementType()->getStructName();
@@ -333,7 +301,7 @@ OCLTypeToSPIRV::adaptArgumentsByMetadata(Function* F) {
         auto AccMD = getArgAccessQualifierMetadata(F);
         assert(AccMD && "Invalid access qualifier metadata");
         auto AccStr = getMDOperandAsString(AccMD, I);
-        addAdaptedType(Arg, getOrCreateOpaquePtrType(M,
+        addAdaptedType(&*Arg, getOrCreateOpaquePtrType(M,
             mapOCLTypeNameToSPIRV(Ty, AccStr)));
         Changed = true;
       }

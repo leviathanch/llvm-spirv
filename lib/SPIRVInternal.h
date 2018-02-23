@@ -44,12 +44,12 @@
 #include "libSPIRV/SPIRVNameMapEnum.h"
 #include "libSPIRV/SPIRVError.h"
 #include "libSPIRV/SPIRVType.h"
-#include "NameMangleAPI.h"
+#include "Mangler/NameMangleAPI.h"
 
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/SPIRV.h"
+#include "SPIRV.h"
 
 #include <utility>
 #include <functional>
@@ -542,7 +542,7 @@ void getFunctionTypeParameterTypes(llvm::FunctionType* FT,
 Function *getOrCreateFunction(Module *M, Type *RetTy,
     ArrayRef<Type *> ArgTypes, StringRef Name,
     BuiltinFuncMangleInfo *Mangle = nullptr,
-    AttributeSet *Attrs = nullptr, bool takeName = true);
+    AttributeList *Attrs = nullptr, bool takeName = true);
 
 /// Get function call arguments.
 /// \param Start Starting index.
@@ -641,7 +641,7 @@ bool hasArrayArg(Function *F);
 /// \return mutated call instruction.
 CallInst *mutateCallInst(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &)>ArgMutate,
-    BuiltinFuncMangleInfo *Mangle = nullptr, AttributeSet *Attrs = nullptr,
+    BuiltinFuncMangleInfo *Mangle = nullptr, AttributeList *Attrs = nullptr,
     bool takeName = false);
 
 /// Mutates function call instruction by changing the arguments and return
@@ -653,14 +653,14 @@ Instruction *mutateCallInst(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &,
         Type *&RetTy)> ArgMutate,
     std::function<Instruction *(CallInst *)> RetMutate,
-    BuiltinFuncMangleInfo *Mangle = nullptr, AttributeSet *Attrs = nullptr,
+    BuiltinFuncMangleInfo *Mangle = nullptr, AttributeList *Attrs = nullptr,
     bool takeName = false);
 
 /// Mutate call instruction to call SPIR-V builtin function.
 CallInst *
 mutateCallInstSPIRV(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &)>ArgMutate,
-    AttributeSet *Attrs = nullptr);
+    AttributeList *Attrs = nullptr);
 
 /// Mutate call instruction to call SPIR-V builtin function.
 Instruction *
@@ -668,7 +668,7 @@ mutateCallInstSPIRV(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &,
         Type *&RetTy)> ArgMutate,
     std::function<Instruction *(CallInst *)> RetMutate,
-    AttributeSet *Attrs = nullptr);
+    AttributeList *Attrs = nullptr);
 
 /// Mutate function by change the arguments.
 /// \param ArgMutate mutates the function arguments.
@@ -676,12 +676,12 @@ mutateCallInstSPIRV(Module *M, CallInst *CI,
 ///   different type needs to be created.
 void mutateFunction(Function *F,
     std::function<std::string (CallInst *, std::vector<Value *> &)>ArgMutate,
-    BuiltinFuncMangleInfo *Mangle = nullptr, AttributeSet *Attrs = nullptr,
+    BuiltinFuncMangleInfo *Mangle = nullptr, AttributeList *Attrs = nullptr,
     bool TakeName = true);
 
 /// Add a call instruction at \p Pos.
 CallInst *addCallInst(Module *M, StringRef FuncName, Type *RetTy,
-    ArrayRef<Value *> Args, AttributeSet *Attrs, Instruction *Pos,
+    ArrayRef<Value *> Args, AttributeList *Attrs, Instruction *Pos,
     BuiltinFuncMangleInfo *Mangle = nullptr,
     StringRef InstName = SPIR_TEMP_NAME_PREFIX_CALL,
     bool TakeFuncName = true);
@@ -690,7 +690,7 @@ CallInst *addCallInst(Module *M, StringRef FuncName, Type *RetTy,
 CallInst *
 addCallInstSPIRV(Module *M, StringRef FuncName, Type *RetTy,
     ArrayRef<Value *> Args,
-    AttributeSet *Attrs, Instruction *Pos, StringRef InstName);
+    AttributeList *Attrs, Instruction *Pos, StringRef InstName);
 
 /// Add a call of spir_block_bind function.
 CallInst *

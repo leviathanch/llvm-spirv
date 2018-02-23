@@ -15,7 +15,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
-#include "llvm/Support/SPIRV.h"
+#include "SPIRV.h"
 using namespace llvm;
 
 PreservedAnalyses SPIRVWriterPass::run(Module &M) {
@@ -33,7 +33,7 @@ namespace {
     explicit WriteSPIRVPass(raw_ostream &o)
       : ModulePass(ID), OS(o) {}
 
-    const char *getPassName() const override { return "SPIRV Writer"; }
+    StringRef getPassName() const override { return "SPIRV Writer"; }
 
     bool runOnModule(Module &M) override {
       // FIXME: at the moment LLVM/SPIR-V translation errors are ignored.

@@ -50,20 +50,20 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Type.h"
-#include "llvm/PassManager.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Dwarf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
@@ -106,7 +106,7 @@ const char* kPlaceholderPrefix = "placeholder.";
 static bool DbgSaveTmpLLVM = true;
 static const char *DbgTmpLLVMFileName = "_tmp_llvmbil.ll";
 
-typedef std::pair < unsigned, AttributeSet > AttributeWithIndex;
+typedef std::pair < unsigned, AttributeList > AttributeWithIndex;
 
 static bool
 isOpenCLKernel(SPIRVFunction *BF) {
@@ -190,11 +190,8 @@ public:
     if (!Enable)
       return;
     auto File = SpDbg.getEntryPointFileStr(ExecutionModelKernel, 0);
-    std::string BaseName;
-    std::string Path;
-    splitFileName(File, BaseName, Path);
     Builder.createCompileUnit(dwarf::DW_LANG_C99,
-      BaseName, Path, "spirv", false, "", 0, "", DIBuilder::LineTablesOnly);
+      getDIFile(File), "spirv", false, "", 0, "", DICompileUnit::DebugEmissionKind::LineTablesOnly);
   }
 
   void addDbgInfoVersion() {
@@ -206,7 +203,7 @@ public:
         DEBUG_METADATA_VERSION);
   }
 
-  DIFile getDIFile(const std::string &FileName){
+  DIFile *getDIFile(const std::string &FileName){
     return getOrInsert(FileMap, FileName, [=](){
       std::string BaseName;
       std::string Path;
@@ -214,7 +211,7 @@ public:
       if (!BaseName.empty())
         return Builder.createFile(BaseName, Path);
       else
-        return DIFile();
+         return (DIFile *)nullptr;
     });
   }
 
@@ -1175,7 +1172,7 @@ SPIRVToLLVM::postProcessOCLBuiltinWithArrayArguments(Function* F,
 Instruction *
 SPIRVToLLVM::postProcessOCLReadImage(SPIRVInstruction *BI, CallInst* CI,
     const std::string &FuncName) {
-  AttributeSet Attrs = CI->getCalledFunction()->getAttributes();
+  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   StringRef ImageTypeName;
   bool isDepthImage = false;
   if (isOCLImageType(
@@ -1227,7 +1224,7 @@ SPIRVToLLVM::postProcessOCLReadImage(SPIRVInstruction *BI, CallInst* CI,
 CallInst*
 SPIRVToLLVM::postProcessOCLWriteImage(SPIRVInstruction *BI, CallInst *CI,
                                       const std::string &DemangledName) {
-  AttributeSet Attrs = CI->getCalledFunction()->getAttributes();
+  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   return mutateCallInstOCL(M, CI, [=](CallInst *, std::vector<Value *> &Args) {
     llvm::Type *T = Args[2]->getType();
     if (Args.size() > 4) {
@@ -1263,7 +1260,7 @@ SPIRVToLLVM::postProcessOCLBuildNDRange(SPIRVInstruction *BI, CallInst *CI,
 Instruction *
 SPIRVToLLVM::postProcessGroupAllAny(CallInst *CI,
                                     const std::string &DemangledName) {
-  AttributeSet Attrs = CI->getCalledFunction()->getAttributes();
+  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   return mutateCallInstSPIRV(
       M, CI,
       [=](CallInst *, std::vector<Value *> &Args, llvm::Type *&RetTy) {
@@ -1283,7 +1280,7 @@ SPIRVToLLVM::postProcessGroupAllAny(CallInst *CI,
 CallInst *
 SPIRVToLLVM::expandOCLBuiltinWithScalarArg(CallInst* CI,
     const std::string &FuncName) {
-  AttributeSet Attrs = CI->getCalledFunction()->getAttributes();
+  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   if (!CI->getOperand(0)->getType()->isVectorTy() &&
     CI->getOperand(1)->getType()->isVectorTy()) {
     return mutateCallInstOCL(M, CI, [=](CallInst *, std::vector<Value *> &Args){
@@ -2047,13 +2044,13 @@ SPIRVToLLVM::transFunction(SPIRVFunction *BF) {
     if (BA->hasDecorate(DecorationMaxByteOffset, 0, &MaxOffset)) {
       AttrBuilder Builder;
       Builder.addDereferenceableAttr(MaxOffset);
-      I->addAttr(AttributeSet::get(*Context, I->getArgNo() + 1, Builder));
+      I->addAttr(AttributeList::get(*Context, I->getArgNo() + 1, Builder));
     }
   }
   BF->foreachReturnValueAttr([&](SPIRVFuncParamAttrKind Kind){
     if (Kind == FunctionParameterAttributeNoWrite)
       return;
-    F->addAttribute(AttributeSet::ReturnIndex,
+    F->addAttribute(AttributeList::ReturnIndex,
         SPIRSPIRVFuncParamAttrMap::rmap(Kind));
   });
 
@@ -2877,7 +2874,7 @@ SPIRVToLLVM::transLinkageType(const SPIRVValue* V) {
 
 Instruction *SPIRVToLLVM::transOCLAllAny(SPIRVInstruction *I, BasicBlock *BB) {
   CallInst *CI = cast<CallInst>(transSPIRVBuiltinFromInst(I, BB));
-  AttributeSet Attrs = CI->getCalledFunction()->getAttributes();
+  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   return cast<Instruction>(mapValue(
       I, mutateCallInstOCL(
              M, CI,
@@ -2901,7 +2898,7 @@ Instruction *SPIRVToLLVM::transOCLAllAny(SPIRVInstruction *I, BasicBlock *BB) {
 
 Instruction *SPIRVToLLVM::transOCLRelational(SPIRVInstruction *I, BasicBlock *BB) {
   CallInst *CI = cast<CallInst>(transSPIRVBuiltinFromInst(I, BB));
-  AttributeSet Attrs = CI->getCalledFunction()->getAttributes();
+  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   return cast<Instruction>(mapValue(
       I, mutateCallInstOCL(
              M, CI,

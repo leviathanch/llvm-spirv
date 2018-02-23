@@ -45,7 +45,8 @@
 #include "OCLUtil.h"
 
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -77,13 +78,12 @@ EnableDbgOutput("spirv-debug",
 
 void
 addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
-  Call->addAttribute(AttributeSet::FunctionIndex, Attr);
+  Call->addAttribute(AttributeList::FunctionIndex, Attr);
 }
 
 void
 removeFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
-  Call->removeAttribute(AttributeSet::FunctionIndex,
-      Attribute::get(*Context, Attr));
+  Call->removeAttribute(AttributeList::FunctionIndex, Attr);
 }
 
 Value *
@@ -298,7 +298,7 @@ isSPIRVType(llvm::Type* Ty, StringRef BaseTyName, StringRef *Postfix) {
 
 Function *
 getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes,
-    StringRef Name, BuiltinFuncMangleInfo *Mangle, AttributeSet *Attrs,
+    StringRef Name, BuiltinFuncMangleInfo *Mangle, AttributeList *Attrs,
     bool takeName) {
   std::string MangledName = Name;
   bool isVarArg = false;
@@ -641,7 +641,7 @@ hasArrayArg(Function *F) {
 CallInst *
 mutateCallInst(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &)>ArgMutate,
-    BuiltinFuncMangleInfo *Mangle, AttributeSet *Attrs, bool TakeFuncName) {
+    BuiltinFuncMangleInfo *Mangle, AttributeList *Attrs, bool TakeFuncName) {
   DEBUG(dbgs() << "[mutateCallInst] " << *CI);
 
   auto Args = getArguments(CI);
@@ -665,7 +665,7 @@ mutateCallInst(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &,
         Type *&RetTy)>ArgMutate,
     std::function<Instruction *(CallInst *)> RetMutate,
-    BuiltinFuncMangleInfo *Mangle, AttributeSet *Attrs, bool TakeFuncName) {
+    BuiltinFuncMangleInfo *Mangle, AttributeList *Attrs, bool TakeFuncName) {
   DEBUG(dbgs() << "[mutateCallInst] " << *CI);
 
   auto Args = getArguments(CI);
@@ -690,7 +690,7 @@ mutateCallInst(Module *M, CallInst *CI,
 void
 mutateFunction(Function *F,
     std::function<std::string (CallInst *, std::vector<Value *> &)>ArgMutate,
-    BuiltinFuncMangleInfo *Mangle, AttributeSet *Attrs,
+    BuiltinFuncMangleInfo *Mangle, AttributeList *Attrs,
     bool TakeFuncName) {
   auto M = F->getParent();
   for (auto I = F->user_begin(), E = F->user_end(); I != E;) {
@@ -704,7 +704,7 @@ mutateFunction(Function *F,
 CallInst *
 mutateCallInstSPIRV(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &)>ArgMutate,
-    AttributeSet *Attrs) {
+    AttributeList *Attrs) {
   BuiltinFuncMangleInfo BtnInfo;
   return mutateCallInst(M, CI, ArgMutate, &BtnInfo, Attrs);
 }
@@ -714,14 +714,14 @@ mutateCallInstSPIRV(Module *M, CallInst *CI,
     std::function<std::string (CallInst *, std::vector<Value *> &,
         Type *&RetTy)> ArgMutate,
     std::function<Instruction *(CallInst *)> RetMutate,
-    AttributeSet *Attrs) {
+    AttributeList *Attrs) {
   BuiltinFuncMangleInfo BtnInfo;
   return mutateCallInst(M, CI, ArgMutate, RetMutate, &BtnInfo, Attrs);
 }
 
 CallInst *
 addCallInst(Module *M, StringRef FuncName, Type *RetTy, ArrayRef<Value *> Args,
-    AttributeSet *Attrs, Instruction *Pos, BuiltinFuncMangleInfo *Mangle,
+    AttributeList *Attrs, Instruction *Pos, BuiltinFuncMangleInfo *Mangle,
     StringRef InstName, bool TakeFuncName) {
 
   auto F = getOrCreateFunction(M, RetTy, getTypes(Args),
@@ -734,7 +734,7 @@ addCallInst(Module *M, StringRef FuncName, Type *RetTy, ArrayRef<Value *> Args,
 
 CallInst *
 addCallInstSPIRV(Module *M, StringRef FuncName, Type *RetTy, ArrayRef<Value *> Args,
-    AttributeSet *Attrs, Instruction *Pos, StringRef InstName) {
+    AttributeList *Attrs, Instruction *Pos, StringRef InstName) {
   BuiltinFuncMangleInfo BtnInfo;
   return addCallInst(M, FuncName, RetTy, Args, Attrs, Pos, &BtnInfo,
       InstName);
@@ -821,7 +821,7 @@ addBlockBind(Module *M, Function *InvokeFunc, Value *BlkCtx, Value *CtxLen,
 
 IntegerType* getSizetType(Module *M) {
   return IntegerType::getIntNTy(M->getContext(),
-    M->getDataLayout()->getPointerSizeInBits(0));
+    M->getDataLayout().getPointerSizeInBits(0));
 }
 
 Type *
@@ -1164,7 +1164,7 @@ getScalarOrArrayConstantInt(Instruction *Pos, Type *T, unsigned Len, uint64_t V,
     auto AT = ArrayType::get(ET, Len);
     std::vector<Constant *> EV(Len, ConstantInt::get(ET, V, isSigned));
     auto CA = ConstantArray::get(AT, EV);
-    auto Alloca = new AllocaInst(AT, "", Pos);
+    auto Alloca = new AllocaInst(AT, 0, "", Pos);
     new StoreInst(CA, Alloca, Pos);
     auto Zero = ConstantInt::getNullValue(Type::getInt32Ty(T->getContext()));
     Value *Index[] = {Zero, Zero};
@@ -1372,7 +1372,7 @@ bool
 eraseUselessFunctions(Module *M) {
   bool changed = false;
   for (auto I = M->begin(), E = M->end(); I != E;)
-    changed |= eraseIfNoUse(I++);
+    changed |= eraseIfNoUse(&*I++);
   return changed;
 }
 

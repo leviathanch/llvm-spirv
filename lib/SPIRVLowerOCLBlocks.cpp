@@ -51,7 +51,8 @@
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -146,7 +147,7 @@ private:
   eraseUselessFunctions() {
     bool changed = false;
     for (auto I = M->begin(), E = M->end(); I != E;) {
-      Function *F = I++;
+      Function *F = &*I++;
       if (!GlobalValue::isInternalLinkage(F->getLinkage()) &&
           !F->isDeclaration())
         continue;
@@ -342,8 +343,9 @@ private:
       DEBUG(dbgs() << "[lowerReturnBlock] inline " << F->getName() << '\n');
       auto CG = &getAnalysis<CallGraphWrapperPass>().getCallGraph();
       auto ACT = &getAnalysis<AssumptionCacheTracker>();
-      auto AA = &getAnalysis<AliasAnalysis>();
-      InlineFunctionInfo IFI(CG, M->getDataLayout(), AA, ACT);
+      std::function<AssumptionCache &(Function &)> actf=
+         [&ACT](Function& f) -> AssumptionCache & {return ACT->getAssumptionCache(f);};
+      InlineFunctionInfo IFI(CG, &actf);
       InlineFunction(CI, IFI);
       Inlined = true;
     }
@@ -451,7 +453,8 @@ private:
       // If any of the arguments to the function are in the VMap,
       // the arguments are deleted from the resultant function.
       VMap[FirstArg] = llvm::UndefValue::get(FirstArg->getType());
-      Function *NF = CloneFunction(&F, VMap, true);
+      ClonedCodeInfo CCI;
+      Function *NF = CloneFunction(&F, VMap, &CCI);
       F.getParent()->getFunctionList().insert(F, NF);
       NF->takeName(&F);
 
@@ -605,7 +608,8 @@ INITIALIZE_PASS_BEGIN(SPIRVLowerOCLBlocks, "spvblocks",
     "SPIR-V lower OCL blocks", false, false)
 INITIALIZE_PASS_DEPENDENCY(CallGraphWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
-INITIALIZE_AG_DEPENDENCY(AliasAnalysis)
+//INITIALIZE_AG_DEPENDENCY(AliasAnalysis)
+initializeAnalysis(Registry);
 INITIALIZE_PASS_END(SPIRVLowerOCLBlocks, "spvblocks",
     "SPIR-V lower OCL blocks", false, false)
 
