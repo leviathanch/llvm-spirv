@@ -96,7 +96,7 @@ public:
   void setAlignment(SPIRVWord);
   void setVolatile(bool IsVolatile);
 
-  void validate()const {
+  void validate()const override {
     SPIRVEntry::validate();
     assert((!hasType() || Type) && "Invalid type");
   }
@@ -110,7 +110,7 @@ public:
       setHasNoType();
   }
 
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
     if (!hasType())
       return std::move(CV);
@@ -160,20 +160,20 @@ protected:
       NumWords = 1;
     WordCount = 3 + NumWords;
   }
-  void validate() const {
+  void validate() const override {
     SPIRVValue::validate();
     assert(NumWords >= 1 && NumWords <= 2 && "Invalid constant size");
   }
-  void encode(spv_ostream &O) const {
+  void encode(spv_ostream &O) const override {
     getEncoder(O) << Type << Id;
     for (unsigned i = 0; i < NumWords; ++i)
       getEncoder(O) << Union.Words[i];
   }
-  void setWordCount(SPIRVWord WordCount) {
+  void setWordCount(SPIRVWord WordCount) override {
     SPIRVValue::setWordCount(WordCount);
     NumWords = WordCount - 3;
   }
-  void decode(std::istream &I) {
+  void decode(std::istream &I) override {
     getDecoder(I) >> Type >> Id;
     for (unsigned i = 0; i < NumWords; ++i)
       getDecoder(I) >> Union.Words[i];
@@ -202,7 +202,7 @@ public:
   // Incomplete constructor
   SPIRVConstantEmpty():SPIRVValue(OC){}
 protected:
-  void validate() const {
+  void validate() const override {
     SPIRVValue::validate();
   }
   _SPIRV_DEF_ENCDEC2(Type, Id)
@@ -217,7 +217,7 @@ public:
   // Incomplete constructor
   SPIRVConstantBool(){}
 protected:
-  void validate() const {
+  void validate() const override {
     SPIRVConstantEmpty<OC>::validate();
     assert(this->Type->isTypeBool() && "Invalid type");
   }
@@ -237,7 +237,7 @@ public:
   // Incomplete constructor
   SPIRVConstantNull(){}
 protected:
-  void validate() const {
+  void validate() const override {
     SPIRVConstantEmpty::validate();
     assert((Type->isTypeComposite() ||
             Type->isTypeOpaque() ||
@@ -260,7 +260,7 @@ public:
   // Incomplete constructor
   SPIRVUndef(){}
 protected:
-  void validate() const {
+  void validate() const override {
     SPIRVConstantEmpty::validate();
   }
 };
@@ -280,17 +280,17 @@ public:
   std::vector<SPIRVValue*> getElements()const {
     return getValues(Elements);
   }
-  std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     std::vector<SPIRVValue*> Elements = getElements();
     return std::vector<SPIRVEntry*>(Elements.begin(), Elements.end());
   }
 protected:
-  void validate() const {
+  void validate() const override {
     SPIRVValue::validate();
     for (auto &I:Elements)
       getValue(I)->validate();
   }
-  void setWordCount(SPIRVWord WordCount) {
+  void setWordCount(SPIRVWord WordCount) override {
     SPIRVEntry::setWordCount(WordCount);
     Elements.resize(WordCount - 3);
   }
@@ -325,14 +325,14 @@ public:
   SPIRVWord getNormalized() const {
     return Normalized;
   }
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getVec(CapabilityLiteralSampler);
   }
 protected:
   SPIRVWord AddrMode;
   SPIRVWord Normalized;
   SPIRVWord FilterMode;
-  void validate() const {
+  void validate() const override {
     SPIRVValue::validate();
     assert(OpCode == OC);
     assert(WordCount == WC);
@@ -367,14 +367,14 @@ public:
   SPIRVWord getCapacity() const {
     return Capacity;
   }
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getVec(CapabilityPipes, CapabilityPipeStorage);
   }
 protected:
   SPIRVWord PacketSize;
   SPIRVWord PacketAlign;
   SPIRVWord Capacity;
-  void validate() const {
+  void validate() const override {
     SPIRVValue::validate();
     assert(OpCode == OC);
     assert(WordCount == WC);
@@ -398,7 +398,7 @@ public:
   _SPIRV_DEF_ENCDEC1(Id)
   friend class SPIRVFunction;
 protected:
-  void validate() const {}
+  void validate() const override {}
 };
 
 }

@@ -140,7 +140,7 @@ public:
 
   unsigned getBitWidth() const { return BitWidth;}
   bool isSigned() const { return IsSigned;}
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
     switch (BitWidth) {
     case 8:
@@ -160,7 +160,7 @@ public:
 
 protected:
   _SPIRV_DEF_ENCDEC3(Id, BitWidth, IsSigned)
-  void validate()const {
+  void validate()const override {
     SPIRVEntry::validate();
     assert(BitWidth > 1 && BitWidth <= 64 && "Invalid bit width");
   }
@@ -180,7 +180,7 @@ public:
 
   unsigned getBitWidth() const { return BitWidth;}
 
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
     if (isTypeFloat(16)) {
       CV.push_back(CapabilityFloat16Buffer);
@@ -197,7 +197,7 @@ public:
 
 protected:
   _SPIRV_DEF_ENCDEC2(Id, BitWidth)
-  void validate()const {
+  void validate() const override {
     SPIRVEntry::validate();
     assert(BitWidth >= 16 && BitWidth <= 64 && "Invalid bit width");
   }
@@ -224,7 +224,7 @@ public:
     return static_cast<SPIRVType *>(getEntry(ElemTypeId));
   }
   SPIRVStorageClassKind getStorageClass() const { return ElemStorageClass;}
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     auto Cap = getVec(CapabilityAddresses);
     if (getElementType()->isTypeFloat(16))
       Cap.push_back(CapabilityFloat16Buffer);
@@ -232,13 +232,13 @@ public:
     Cap.insert(Cap.end(), C.begin(), C.end());
     return Cap;
   }
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     return std::vector<SPIRVEntry*>(1, getEntry(ElemTypeId));
   }
 
 protected:
   _SPIRV_DEF_ENCDEC3(Id, ElemStorageClass, ElemTypeId)
-  void validate()const {
+  void validate() const override {
     SPIRVEntry::validate();
     assert(isValid(ElemStorageClass));
   }
@@ -279,20 +279,20 @@ public:
   SPIRVType *getComponentType() const { return CompType;}
   SPIRVWord getComponentCount() const { return CompCount;}
   bool isValidIndex(SPIRVWord Index) const { return Index < CompCount;}
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec V(getComponentType()->getRequiredCapability());
     if (CompCount > 8)
       V.push_back(CapabilityVector16);
     return std::move(V);
   }
 
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     return std::vector<SPIRVEntry*>(1, CompType);
   }
 
 protected:
   _SPIRV_DEF_ENCDEC3(Id, CompType, CompCount)
-  void validate()const {
+  void validate()const override {
     SPIRVEntry::validate();
     CompType->validate();
     assert(CompCount == 2 || CompCount == 3 || CompCount == 4 ||
@@ -315,10 +315,10 @@ public:
 
   SPIRVType *getElementType() const { return ElemType;}
   SPIRVConstant *getLength() const;
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return std::move(getElementType()->getRequiredCapability());
   }
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     std::vector<SPIRVEntry*> Operands(2, ElemType);
     Operands[1] = (SPIRVEntry*)getLength();
     return Operands;
@@ -327,7 +327,7 @@ public:
 
 protected:
   _SPIRV_DCL_ENCDEC
-  void validate()const;
+  void validate() const override;
 private:
   SPIRVType *ElemType;                // Element Type
   SPIRVId Length;                     // Array Length
@@ -346,7 +346,7 @@ public:
 
 protected:
   _SPIRV_DEF_ENCDEC2(Id, Name)
-  void validate()const {
+  void validate() const override {
     SPIRVEntry::validate();
   }
 };
@@ -430,7 +430,7 @@ public:
     assert(hasAccessQualifier());
     return Acc[0];
   }
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
     CV.push_back(CapabilityImageBasic);
     if (Desc.Dim == SPIRVImageDimKind::Dim1D)
@@ -447,7 +447,7 @@ public:
     return get<SPIRVType>(SampledType);
   }
 
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     return std::vector<SPIRVEntry*>(1, get<SPIRVType>(SampledType));
   }
 
@@ -455,7 +455,7 @@ protected:
   _SPIRV_DEF_ENCDEC9(Id, SampledType, Desc.Dim, Desc.Depth,
       Desc.Arrayed, Desc.MS, Desc.Sampled, Desc.Format, Acc)
   // The validation assumes OpenCL image or sampler type.
-  void validate()const {
+  void validate()const override {
     assert(OpCode == OC);
     assert(WordCount == FixedWC + Acc.size());
     assert(SampledType != SPIRVID_INVALID && "Invalid sampled type");
@@ -467,7 +467,7 @@ protected:
     assert(Desc.Format == 0);  // For OCL only
     assert(Acc.size() <= 1);
   }
-  void setWordCount(SPIRVWord TheWC) {
+  void setWordCount(SPIRVWord TheWC) override {
     WordCount = TheWC;
     Acc.resize(WordCount - FixedWC);
   }
@@ -489,7 +489,7 @@ public:
   }
 protected:
   _SPIRV_DEF_ENCDEC1(Id)
-  void validate()const {
+  void validate()const override {
     assert(OpCode == OC);
     assert(WordCount == FixedWC);
   }
@@ -514,14 +514,14 @@ public:
     ImgTy = TheImgTy;
   }
 
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     return std::vector<SPIRVEntry*>(1, ImgTy);
   }
 
 protected:
   SPIRVTypeImage *ImgTy;
   _SPIRV_DEF_ENCDEC2(Id, ImgTy)
-  void validate()const {
+  void validate() const override{
     assert(OpCode == OC);
     assert(WordCount == FixedWC);
     assert(ImgTy && ImgTy->isTypeImage());
@@ -540,7 +540,7 @@ public:
   }
 protected:
   _SPIRV_DEF_ENCDEC1(Id)
-    void validate()const {
+    void validate()const override{
       assert(OpCode == OC);
       assert(WordCount == FixedWC);
   }
@@ -578,12 +578,12 @@ public:
   bool isPacked() const;
   void setPacked(bool Packed);
 
-  void setWordCount(SPIRVWord WordCount) {
+  void setWordCount(SPIRVWord WordCount) override {
     SPIRVType::setWordCount(WordCount);
     MemberTypeIdVec.resize(WordCount - 2);
   }
 
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     std::vector<SPIRVEntry*> Operands(MemberTypeIdVec.size());
     for (size_t I = 0, E = MemberTypeIdVec.size(); I < E; ++I)
       Operands[I] = getEntry(MemberTypeIdVec[I]);
@@ -593,7 +593,7 @@ public:
 protected:
   _SPIRV_DEF_ENCDEC2(Id, MemberTypeIdVec)
 
-  void validate() const { SPIRVEntry::validate(); }
+  void validate() const override { SPIRVEntry::validate(); }
 
 private:
   std::vector<SPIRVId> MemberTypeIdVec; // Member Type Ids
@@ -614,7 +614,7 @@ public:
   SPIRVType *getReturnType() const { return ReturnType;}
   SPIRVWord getNumParameters() const { return ParamTypeVec.size();}
   SPIRVType *getParameterType(unsigned I) const { return ParamTypeVec[I];}
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     std::vector<SPIRVEntry*> Operands( 1 + ParamTypeVec.size(), ReturnType);
     std::copy(ParamTypeVec.begin(), ParamTypeVec.end(), ++Operands.begin());
     return Operands;
@@ -622,11 +622,11 @@ public:
 
 protected:
   _SPIRV_DEF_ENCDEC3(Id, ReturnType, ParamTypeVec)
-  void setWordCount(SPIRVWord WordCount) {
+  void setWordCount(SPIRVWord WordCount) override {
     SPIRVType::setWordCount(WordCount);
     ParamTypeVec.resize(WordCount - 3);
   }
-  void validate()const {
+  void validate()const override {
     SPIRVEntry::validate();
     ReturnType->validate();
     for (auto T:ParamTypeVec)
@@ -654,7 +654,7 @@ public:
   }
 protected:
   _SPIRV_DEF_ENCDEC1(Id)
-  void validate()const {
+  void validate()const override {
     SPIRVEntry::validate();
     }
   SPIRVId Opn;
@@ -686,13 +686,13 @@ public:
   // Incomplete constructor
   SPIRVTypeDeviceEvent() : SPIRVType(OpTypeDeviceEvent) {}
 
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getVec(CapabilityDeviceEnqueue);
   }
 
 protected:
   _SPIRV_DEF_ENCDEC1(Id)
-  void validate() const { SPIRVEntry::validate(); }
+  void validate() const override { SPIRVEntry::validate(); }
 };
 
 class SPIRVTypeQueue : public SPIRVType {
@@ -706,7 +706,7 @@ public:
   // Incomplete constructor
   SPIRVTypeQueue() : SPIRVType(OpTypeQueue) {}
 
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getVec(CapabilityDeviceEnqueue);
   }
 
@@ -735,12 +735,12 @@ public:
     AccessQualifier = AccessQual;
     assert(isValid(AccessQualifier));
   }
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getVec(CapabilityPipes);
   }
 protected:
   _SPIRV_DEF_ENCDEC2(Id, AccessQualifier)
-  void validate()const {
+  void validate() const override {
     SPIRVEntry::validate();
   }
 private:

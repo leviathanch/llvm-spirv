@@ -68,8 +68,8 @@ class SPIRVExtInst;
 // Add declaration of encode/decode functions to a class.
 // Used inside class definition.
 #define _SPIRV_DCL_ENCDEC \
-    void encode(spv_ostream &O) const; \
-    void decode(std::istream &I);
+    void encode(spv_ostream &O) const override; \
+    void decode(std::istream &I) override;
 
 #define _REQ_SPIRV_VER(Version) \
     SPIRVWord getRequiredSPIRVVersion() const override { return Version; }
@@ -399,7 +399,7 @@ public:
   }
 protected:
   _SPIRV_DEF_ENCDEC0
-  void validate()const {
+  void validate()const override {
     assert(isValidId(SPIRVEntry::OpCode));
   }
 };
@@ -452,7 +452,7 @@ public:
   SPIRVName(){}
 protected:
   _SPIRV_DCL_ENCDEC
-  void validate() const;
+  void validate() const override;
 
   std::string Str;
 };
@@ -471,7 +471,7 @@ public:
   SPIRVMemberName():MemberNumber(SPIRVWORD_MAX){}
 protected:
   _SPIRV_DCL_ENCDEC
-  void validate() const;
+  void validate() const override;
   SPIRVWord MemberNumber;
   std::string Str;
 };
@@ -548,7 +548,7 @@ public:
 
 protected:
   _SPIRV_DCL_ENCDEC
-  void validate() const;
+  void validate() const override;
   SPIRVId FileName;
   SPIRVWord Line;
   SPIRVWord Column;
@@ -581,7 +581,7 @@ public:
   SPIRVExecutionMode():ExecMode(ExecutionModeInvocations){}
   SPIRVExecutionModeKind getExecutionMode()const { return ExecMode;}
   const std::vector<SPIRVWord>& getLiterals()const { return WordLiterals;}
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getCapability(ExecMode);
   }
 
@@ -632,7 +632,7 @@ public:
   SPIRVExtInstImport():SPIRVEntry(OC){}
 protected:
   _SPIRV_DCL_ENCDEC
-  void validate() const;
+  void validate() const override;
 
   std::string Str;
 };
@@ -642,7 +642,7 @@ public:
   SPIRVMemoryModel(SPIRVModule *M):SPIRVEntryNoId(M, 3){}
   SPIRVMemoryModel(){}
   _SPIRV_DCL_ENCDEC
-  void validate() const;
+  void validate() const override;
 };
 
 class SPIRVSource:public SPIRVEntryNoId<OpSource> {

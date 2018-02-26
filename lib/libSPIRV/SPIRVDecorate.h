@@ -79,7 +79,7 @@ public:
     Owner = owner;
   }
 
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     return getCapability(Dec);
   }
 
@@ -138,8 +138,8 @@ public:
   SPIRVDecorate():SPIRVDecorateGeneric(OC){}
 
   _SPIRV_DCL_ENCDEC
-  void setWordCount(SPIRVWord);
-  void validate()const {
+  void setWordCount(SPIRVWord) override;
+  void validate() const override{
     SPIRVDecorateGeneric::validate();
     assert(WordCount == Literals.size() + FixedWC);
   }
@@ -219,9 +219,9 @@ public:
   }
 
   _SPIRV_DCL_ENCDEC
-  void setWordCount(SPIRVWord);
+  void setWordCount(SPIRVWord) override;
 
-  void validate()const {
+  void validate() const override{
     SPIRVDecorateGeneric::validate();
     assert(WordCount == Literals.size() + FixedWC);
   }
@@ -240,7 +240,7 @@ public:
   };
   // Incomplete constructor
   SPIRVDecorationGroup():SPIRVEntry(OC){}
-  void encodeAll(spv_ostream &O) const;
+  void encodeAll(spv_ostream &O) const override;
   _SPIRV_DCL_ENCDEC
   // Move the given decorates to the decoration group
   void takeDecorates(SPIRVDecorateSet &Decs) {
@@ -256,7 +256,7 @@ public:
 
 protected:
   SPIRVDecorateSet Decorations;
-  void validate()const {
+  void validate()const override {
     assert(OpCode == OC);
     assert(WordCount == WC);
   }
@@ -276,7 +276,7 @@ public:
   SPIRVGroupDecorateGeneric(Op OC)
     :SPIRVEntryNoIdGeneric(OC), DecorationGroup(nullptr){}
 
-  void setWordCount(SPIRVWord WC) {
+  void setWordCount(SPIRVWord WC) override {
     SPIRVEntryNoIdGeneric::setWordCount(WC);
     Targets.resize(WC - FixedWC);
   }
