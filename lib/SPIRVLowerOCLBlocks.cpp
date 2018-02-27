@@ -104,7 +104,7 @@ public:
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<CallGraphWrapperPass>();
-    AU.addRequired<AliasAnalysis>();
+    getAAResultsAnalysisUsage(AU);
     AU.addRequired<AssumptionCacheTracker>();
   }
 
@@ -423,7 +423,8 @@ private:
   /// the dead argument elimination pass.
   void EliminateDeadArgs() {
     std::vector<Function*> FunctionsToDelete;
-    for (Function &F : M->functions()) {
+    for (auto Iter = M->functions().begin(); Iter != M->functions().end(); ++Iter) {
+      Function &F = *Iter;
       if(F.arg_size() < 1)
         continue;
       auto FirstArg = F.arg_begin();
@@ -455,7 +456,7 @@ private:
       VMap[FirstArg] = llvm::UndefValue::get(FirstArg->getType());
       ClonedCodeInfo CCI;
       Function *NF = CloneFunction(&F, VMap, &CCI);
-      F.getParent()->getFunctionList().insert(F, NF);
+      F.getParent()->getFunctionList().insert(Iter, NF);
       NF->takeName(&F);
 
       // Redirect all users of the old function to the new one.

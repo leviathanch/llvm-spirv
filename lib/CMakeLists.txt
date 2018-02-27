@@ -26,6 +26,7 @@ add_library(llvm_spirv SHARED
   OCLUtil.cpp
   SPIRVLowerBool.cpp
   SPIRVLowerConstExpr.cpp
+  SPIRVLowerMemmove.cpp
   SPIRVLowerOCLBlocks.cpp
   SPIRVUtil.cpp
   SPIRVReader.cpp

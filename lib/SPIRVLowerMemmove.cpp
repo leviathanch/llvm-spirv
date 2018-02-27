@@ -87,7 +87,7 @@ public:
         NumElements = Builder.getInt32(SrcTy->getArrayNumElements());
         ElementsCount = SrcTy->getArrayNumElements();
     }
-    if (Mod->getDataLayout()->getTypeSizeInBits(SrcTy->getPointerElementType()) 
+    if (Mod->getDataLayout().getTypeSizeInBits(SrcTy->getPointerElementType()) 
         * ElementsCount !=  Length->getZExtValue() * 8)
         report_fatal_error("Size of the memcpy should match the allocated memory", 
             false);

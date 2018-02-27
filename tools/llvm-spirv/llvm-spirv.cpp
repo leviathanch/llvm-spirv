@@ -45,12 +45,12 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/DataStream.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -62,7 +62,7 @@
 #define _SPIRV_SUPPORT_TEXT_FMT
 #endif
 
-#include "llvm/Support/SPIRV.h"
+#include "SPIRV.h"
 
 #include <memory>
 #include <fstream>
@@ -119,24 +119,30 @@ convertLLVMToSPIRV() {
   LLVMContext Context;
 
   std::string Err;
-  DataStreamer *DS = getDataFileStreamer(InputFile, &Err);
-  if (!DS) {
-    errs() << "Fails to open input file: " << Err;
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Mem = MemoryBuffer::getFile(InputFile);
+  if (auto EC = Mem.getError()) {
+    errs() << "Fails to open input file: " << EC.message();
     return -1;
   }
 
-  ErrorOr<std::unique_ptr<Module>> MOrErr =
-      getStreamedBitcodeModule(InputFile, DS, Context);
-
-  if (std::error_code EC = MOrErr.getError()) {
-    errs() << "Fails to load bitcode: " << EC.message();
+  Expected<std::vector<BitcodeModule>> Mods =
+    getBitcodeModuleList(Mem.get()->getMemBufferRef());
+  if (auto Err = Mods.takeError()) {
+    errs() << "Failed to retrieve bitcode modules.";
     return -1;
   }
 
-  std::unique_ptr<Module> M = std::move(*MOrErr);
+  Expected<std::unique_ptr<Module>> Mod =
+    Mods.get()[0].getLazyModule(Context, true, false);
+  if (auto Err = Mod.takeError()) {
+    errs() << "Fails to load bitcode.";
+    return -1;
+  }
 
-  if (std::error_code EC = M->materializeAllPermanently()){
-    errs() << "Fails to materialize: " << EC.message();
+  std::unique_ptr<Module> M = std::move(*Mod);
+
+  if (auto Err = M->materializeAll()){
+    errs() << "Fails to materialize the binary.";
     return -1;
   }
 
@@ -238,25 +244,30 @@ static int
 regularizeLLVM() {
   LLVMContext Context;
 
-  std::string Err;
-  DataStreamer *DS = getDataFileStreamer(InputFile, &Err);
-  if (!DS) {
-    errs() << "Fails to open input file: " << Err;
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Mem = MemoryBuffer::getFile(InputFile);
+  if (auto EC = Mem.getError()) {
+    errs() << "Fails to open input file: " << EC.message();
     return -1;
   }
 
-  ErrorOr<std::unique_ptr<Module>> MOrErr =
-      getStreamedBitcodeModule(InputFile, DS, Context);
-
-  if (std::error_code EC = MOrErr.getError()) {
-    errs() << "Fails to load bitcode: " << EC.message();
+  Expected<std::vector<BitcodeModule>> Mods =
+    getBitcodeModuleList(Mem.get()->getMemBufferRef());
+  if (auto Err = Mods.takeError()) {
+    errs() << "Failed to retrieve bitcode modules.";
     return -1;
   }
 
-  std::unique_ptr<Module> M = std::move(*MOrErr);
+  Expected<std::unique_ptr<Module>> Mod =
+    Mods.get()[0].getLazyModule(Context, true, false);
+  if (auto Err = Mod.takeError()) {
+    errs() << "Fails to load bitcode.";
+    return -1;
+  }
 
-  if (std::error_code EC = M->materializeAllPermanently()){
-    errs() << "Fails to materialize: " << EC.message();
+  std::unique_ptr<Module> M = std::move(*Mod);
+
+  if (auto Err = M->materializeAll()){
+    errs() << "Fails to materialize the binary.";
     return -1;
   }
 
@@ -267,6 +278,7 @@ regularizeLLVM() {
       OutputFile = removeExt(InputFile) + ".regularized.bc";
   }
 
+  std::string Err;
   if (!RegularizeLLVMForSPIRV(M.get(), Err)) {
     errs() << "Fails to save LLVM as SPIRV: " << Err << '\n';
     return -1;
@@ -288,7 +300,7 @@ regularizeLLVM() {
 int
 main(int ac, char** av) {
   EnablePrettyStackTrace();
-  sys::PrintStackTraceOnErrorSignal();
+  sys::PrintStackTraceOnErrorSignal(av[0]);
   PrettyStackTraceProgram X(ac, av);
 
   cl::ParseCommandLineOptions(ac, av, "LLVM/SPIR-V translator");
